@@ -34,23 +34,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+// #include <stdlib.h>
 using namespace std;
 
 #include "ap_int.h"
 
+typedef uint64_t data_t;
+
+// Traffic dimension
 #define TRAFFIC_CFG_SIZE_MAX 1024
 #define TRAFFIC_CFG_SIZE 128
-#define TRAFFIC_CFG_IDX 3
+
+// Read/write mode
 #define TRAFFIC_CFG_READ 0
 #define TRAFFIC_CFG_WRITE 1
 
-typedef uint64_t data_t;
+// Destination ID (for TB)
+#define TRAFFIC_CFG_IDX 3
 
 void axi_hls_tg(
-    data_t *traffic_dst, 
+    data_t *traffic_dst,
     data_t traffic_dim,
-    data_t traffic_idx,
-    data_t traffic_rw
+    data_t traffic_id
 );
 
 #endif

@@ -34,23 +34,32 @@ int main(int argc, char** argv) {
 
     // Parameters
     data_t traffic_dim = TRAFFIC_CFG_SIZE;
-    data_t traffic_idx = TRAFFIC_CFG_IDX;
+    data_t traffic_id = TRAFFIC_CFG_IDX;
 
     // External memory
-    data_t ext_memory[TRAFFIC_CFG_SIZE_MAX];
+    data_t dut_memory[TRAFFIC_CFG_SIZE];
+    data_t ref_memory[TRAFFIC_CFG_SIZE];
+    
+    // Test
+    data_t ref_value;
 
-    // Test traffic from traffic generator to external memory
-    axi_hls_tg(ext_memory, traffic_dim, traffic_idx, TRAFFIC_CFG_WRITE);
-
+    // Initialize external memory
     for (int i = 0; i < traffic_dim; i++){
-        if (ext_memory[i] != (traffic_idx + i)) {
+        dut_memory[i] = rand();
+        ref_memory[i] = dut_memory[i];
+    }
+
+    // Test traffic generator
+    axi_hls_tg(dut_memory, traffic_dim, traffic_id);
+
+    // Verification
+    for (int i = 0; i < traffic_dim; i++){
+        ref_value = ref_memory[i] + traffic_id;
+        if (dut_memory[i] != ref_value) {
             fprintf(stderr, "ERROR: Test Failed.\n ");
             return EXIT_FAILURE;
         }   
     }
-
-    // Test read from buffer    
-    axi_hls_tg(ext_memory, traffic_dim, traffic_idx, TRAFFIC_CFG_READ);
 
     return 0;
 }

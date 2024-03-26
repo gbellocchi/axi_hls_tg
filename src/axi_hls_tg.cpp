@@ -30,36 +30,39 @@
 
 #include "axi_hls_tg.h"
 
+void axi_hls_tg_read(data_t *dst, data_t *src, data_t size){
+    memcpy((data_t*)dst, (const data_t*)src, size * sizeof(data_t));
+}
+
+void axi_hls_tg_compute(data_t *buffer, data_t id, data_t size){
+    for (int i = 0; i < size; i++) {
+    #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE max=TRAFFIC_CFG_SIZE
+        buffer[i] += id;
+    }
+}
+
+void axi_hls_tg_write(data_t *dst, data_t *src, data_t size){
+    memcpy((data_t*)dst, src, size * sizeof(data_t));
+}
+
 void axi_hls_tg(
-    data_t *traffic_dst, 
+    data_t *traffic_dst,
     data_t traffic_dim,
-    data_t traffic_idx,
-    data_t traffic_rw
+    data_t traffic_id
 ) {
 
     // Traffic generation
-    #pragma HLS INTERFACE mode=m_axi port=traffic_dst depth=128 offset=slave bundle=traffic_dst
+    #pragma HLS INTERFACE mode=m_axi port=traffic_dst depth=TRAFFIC_CFG_SIZE bundle=traffic_dst
 
     // Traffic control
     #pragma HLS INTERFACE mode=s_axilite port=traffic_dim
-    #pragma HLS INTERFACE mode=s_axilite port=traffic_idx
-    #pragma HLS INTERFACE mode=s_axilite port=traffic_rw
+    #pragma HLS INTERFACE mode=s_axilite port=traffic_id
     #pragma HLS INTERFACE mode=s_axilite port=return
 
-    data_t local_buffer[TRAFFIC_CFG_SIZE_MAX];
+    data_t local_buffer[TRAFFIC_CFG_SIZE];
 
-    // Read from external memory
-    if(traffic_rw == TRAFFIC_CFG_READ){
+    axi_hls_tg_read(local_buffer, traffic_dst, TRAFFIC_CFG_SIZE);
+    axi_hls_tg_compute(local_buffer, traffic_id, TRAFFIC_CFG_SIZE);
+    axi_hls_tg_write(traffic_dst, local_buffer, TRAFFIC_CFG_SIZE);
 
-        memcpy(local_buffer, (const data_t*)traffic_dst, traffic_dim*sizeof(data_t));
-
-    // Write to external memory
-    } else if(traffic_rw == TRAFFIC_CFG_WRITE){
-
-        for (int i = 0; i < traffic_dim; i++) {
-        #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
-            traffic_dst[i] = traffic_idx + i;
-        }
-
-    }
 }
