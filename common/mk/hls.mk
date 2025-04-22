@@ -249,14 +249,21 @@ runhls: data setup | check_vivado check_vpp
 	$(HLS) -f $(TCL_DIR)/run_hls.tcl;
 
 clean:
-	@rm -rf settings.tcl *_hls.log _proj $(PRJ_NAME) $(RTL_DIR)/* 
+	@rm -rf settings.tcl *_hls.log _proj $(PRJ_NAME) $(OUT_DIR)/* 
 
 # Used by Jenkins test
 cleanall: clean
 
+get_all: get_rtl get_drivers
+ 
 get_rtl:
-	@mkdir -p $(RTL_DIR)
-	@rm -f $(RTL_DIR)/*
-	@cp -rf $(SYN_DIR)/* $(RTL_DIR)
+	@mkdir -p $(OUT_DIR)/rtl
+	@rm -f $(OUT_DIR)/rtl/*
+	@cp -rf $(SYN_DIR)/* $(OUT_DIR)/rtl
+
+get_drivers:
+	@mkdir -p $(OUT_DIR)/drivers
+	@rm -rf $(OUT_DIR)/drivers/*
+	@cp -rf $(IMPL_DRIVERS_DIR)/* $(OUT_DIR)/drivers
 
 # MK_INC_END hls_test_rules.mk
