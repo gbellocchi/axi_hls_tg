@@ -33,15 +33,13 @@
 int main(int argc, char** argv) {
 
     // Parameters
-    data_t traffic_dim = TRAFFIC_CFG_SIZE;
-    data_t traffic_id = TRAFFIC_CFG_IDX;
+    data_t traffic_dim = TRAFFIC_CFG_SIZE_TEST;
+    data_t compute_dim = COMPUTE_CFG_SIZE_TEST;
+    data_t traffic_id = TRAFFIC_CFG_IDX_TEST;
 
     // External memory
     data_t dut_memory[TRAFFIC_CFG_SIZE];
     data_t ref_memory[TRAFFIC_CFG_SIZE];
-    
-    // Test
-    data_t ref_value;
 
     // Initialize external memory
     for (int i = 0; i < traffic_dim; i++){
@@ -50,15 +48,17 @@ int main(int argc, char** argv) {
     }
 
     // Test traffic generator
-    axi_hls_tg(dut_memory, traffic_dim, traffic_id);
+    axi_hls_tg(dut_memory, traffic_dim, compute_dim, traffic_id);
 
     // Verification
-    for (int i = 0; i < traffic_dim; i++){
-        ref_value = ref_memory[i] + traffic_id;
-        if (dut_memory[i] != ref_value) {
-            fprintf(stderr, "ERROR: Test Failed.\n ");
-            return EXIT_FAILURE;
-        }   
+    for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
+        for (int j = 0; j < TRAFFIC_CFG_SIZE; j++){
+            ref_memory[i] += traffic_id;
+            if (dut_memory[i] != ref_memory[i]) {
+                fprintf(stderr, "ERROR: Test Failed.\n ");
+                return EXIT_FAILURE;
+            } 
+        }  
     }
 
     return 0;

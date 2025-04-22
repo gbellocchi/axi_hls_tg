@@ -30,24 +30,65 @@
 
 #include "axi_hls_tg.h"
 
-void axi_hls_tg_read(data_t *dst, data_t *src, data_t size){
-    memcpy((data_t*)dst, (const data_t*)src, size * sizeof(data_t));
+/* Read module */
+
+void axi_hls_tg_read(
+    data_t *dst, 
+#if TRAFFIC_BURST_MODE == 0
+    volatile data_t *src,
+#elif TRAFFIC_BURST_MODE == 1
+    data_t *src,
+#endif 
+    data_t size
+){
+    read_from: memcpy((data_t*)dst, (const data_t*)src, size * sizeof(data_t));
 }
 
-void axi_hls_tg_compute(data_t *buffer, data_t id, data_t size){
-    for (int i = 0; i < size; i++) {
+/* Computation module */
+
+void axi_hls_tg_compute(
+#if TRAFFIC_BURST_MODE == 0
+    volatile data_t *buffer,
+#elif TRAFFIC_BURST_MODE == 1
+    data_t *buffer,
+#endif 
+    data_t id, 
+    data_t size
+){
+    compute: for (int i = 0; i < size; i++) {
     #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE max=TRAFFIC_CFG_SIZE
         buffer[i] += id;
     }
 }
 
-void axi_hls_tg_write(data_t *dst, data_t *src, data_t size){
-    memcpy((data_t*)dst, src, size * sizeof(data_t));
+/* Write module */
+
+void axi_hls_tg_write(
+#if TRAFFIC_BURST_MODE == 0
+    volatile data_t *dst, 
+#elif TRAFFIC_BURST_MODE == 1
+    data_t *dst, 
+#endif  
+    data_t *src,
+    data_t size
+){
+    write_back: memcpy((data_t*)dst, src, size * sizeof(data_t));
 }
 
+/* Traffic generator top */
+
 void axi_hls_tg(
+    // AXI4 interfaces
+#if TRAFFIC_BURST_MODE == 0
+    volatile data_t *traffic_dst,
+#elif TRAFFIC_BURST_MODE == 1
     data_t *traffic_dst,
+#endif
+    // Traffic dimension
     data_t traffic_dim,
+    // Compute dimension
+    data_t compute_dim,
+    // Traffic ID
     data_t traffic_id
 ) {
 
@@ -56,13 +97,31 @@ void axi_hls_tg(
 
     // Traffic control
     #pragma HLS INTERFACE mode=s_axilite port=traffic_dim
+    #pragma HLS INTERFACE mode=s_axilite port=compute_dim
     #pragma HLS INTERFACE mode=s_axilite port=traffic_id
     #pragma HLS INTERFACE mode=s_axilite port=return
 
+    // Optimizations
+#if TRAFFIC_BURST_MODE == 0
+    #pragma HLS pipeline off
+#elif TRAFFIC_BURST_MODE == 1
+    #pragma HLS pipeline
+#endif
+
     data_t local_buffer[TRAFFIC_CFG_SIZE];
 
-    axi_hls_tg_read(local_buffer, traffic_dst, TRAFFIC_CFG_SIZE);
-    axi_hls_tg_compute(local_buffer, traffic_id, TRAFFIC_CFG_SIZE);
-    axi_hls_tg_write(traffic_dst, local_buffer, TRAFFIC_CFG_SIZE);
+    for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
+    #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
+        axi_hls_tg_read(local_buffer, traffic_dst, TRAFFIC_CFG_SIZE);
+    }
 
+    for (int i = 0; i < (compute_dim/TRAFFIC_CFG_SIZE); i++) {
+    #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
+        axi_hls_tg_compute(local_buffer, traffic_id, TRAFFIC_CFG_SIZE);
+    }
+    
+    for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
+    #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
+        axi_hls_tg_write(traffic_dst, local_buffer, TRAFFIC_CFG_SIZE);
+    }
 }

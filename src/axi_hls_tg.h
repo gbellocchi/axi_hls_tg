@@ -41,20 +41,27 @@ using namespace std;
 
 typedef uint64_t data_t;
 
-// Traffic dimension
-#define TRAFFIC_CFG_SIZE_MAX 1024
-#define TRAFFIC_CFG_SIZE 128
+// Dimension of internal data buffer and DMA chunk
+// By extension, this value also corresponds to the DMA burst dimension (number of beats)
+#define TRAFFIC_CFG_SIZE 64
+#define TRAFFIC_CFG_SIZE_MAX 256
 
-// Read/write mode
-#define TRAFFIC_CFG_READ 0
-#define TRAFFIC_CFG_WRITE 1
+// Optimizations
+#define TRAFFIC_BURST_MODE 1 // 0: no burst, 1: automatic pipeline burst
 
-// Destination ID (for TB)
-#define TRAFFIC_CFG_IDX 3
+// Testbench
+#define TRAFFIC_CFG_SIZE_TEST 32
+#define COMPUTE_CFG_SIZE_TEST 32
+#define TRAFFIC_CFG_IDX_TEST 3
 
 void axi_hls_tg(
+#if TRAFFIC_BURST_MODE == 0
+    volatile data_t *traffic_dst,
+#elif TRAFFIC_BURST_MODE == 1
     data_t *traffic_dst,
+#endif
     data_t traffic_dim,
+    data_t compute_dim,
     data_t traffic_id
 );
 
