@@ -33,32 +33,49 @@
 int main(int argc, char** argv) {
 
     // Parameters
-    data_t traffic_dim = TRAFFIC_CFG_SIZE_TEST;
-    data_t compute_dim = COMPUTE_CFG_SIZE_TEST;
-    data_t traffic_id = TRAFFIC_CFG_IDX_TEST;
+    ctrl_t traffic_dim = TRAFFIC_CFG_SIZE_TEST;
+    ctrl_t compute_dim = COMPUTE_CFG_SIZE_TEST;
+    ctrl_t traffic_id = TRAFFIC_CFG_IDX_TEST;
 
-    // External memory
-    data_t dut_memory[TRAFFIC_CFG_SIZE];
-    data_t ref_memory[TRAFFIC_CFG_SIZE];
+    // External wide memory
+    wide_t dut_wide_memory[TRAFFIC_CFG_SIZE];
+    wide_t ref_wide_memory[TRAFFIC_CFG_SIZE];
 
-    // Initialize external memory
-    for (int i = 0; i < traffic_dim; i++){
-        dut_memory[i] = rand();
-        ref_memory[i] = dut_memory[i];
+    // External narrow memory
+    narrow_t dut_narrow_memory[TRAFFIC_CFG_SIZE];
+    narrow_t ref_narrow_memory[TRAFFIC_CFG_SIZE];
+
+    // Initialize external wide memory (HBM)
+    for (int i = 0; i < traffic_dim/N_LOOPS_TEST; i++){
+        dut_wide_memory[i] = rand();
+        ref_wide_memory[i] = dut_wide_memory[i];
+    }
+
+    // Initialize external narrow memory
+    for (int i = 0; i < traffic_dim/N_LOOPS_TEST; i++){
+        dut_narrow_memory[i] = rand();
+        ref_narrow_memory[i] = dut_narrow_memory[i];
     }
 
     // Test traffic generator
-    axi_hls_tg(dut_memory, traffic_dim, compute_dim, traffic_id);
+    axi_hls_tg(dut_wide_memory, dut_narrow_memory, traffic_dim, compute_dim, traffic_id);
 
     // Verification
-    for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
-        for (int j = 0; j < TRAFFIC_CFG_SIZE; j++){
-            ref_memory[i] += traffic_id;
-            if (dut_memory[i] != ref_memory[i]) {
-                fprintf(stderr, "ERROR: Test Failed.\n ");
-                return EXIT_FAILURE;
-            } 
+    for (int i = 0; i < TRAFFIC_CFG_SIZE; i++) {
+        // Compute golden results
+        for (int j = 0; j < N_LOOPS_TEST; j++){
+            ref_wide_memory[i] += traffic_id;
+            ref_narrow_memory[i] += traffic_id;
         }  
+        // Check DUT correctness
+        if (dut_wide_memory[i] != ref_wide_memory[i]) {
+            fprintf(stderr, "ERROR: WIDE_DUT test failed.\n ");
+            return EXIT_FAILURE;
+        } 
+        else if (dut_narrow_memory[i] != ref_narrow_memory[i]) {
+            fprintf(stderr, "ERROR: NARROW_DUT test failed.\n ");
+            return EXIT_FAILURE;
+        } 
     }
 
     return 0;

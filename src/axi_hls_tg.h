@@ -39,30 +39,89 @@ using namespace std;
 
 #include "ap_int.h"
 
-typedef uint64_t data_t;
+typedef ap_uint<64> wide_t;  // user-defined wide data type
+typedef ap_uint<64> narrow_t; // user-defined narrow data type
+typedef ap_uint<64> ctrl_t; // user-defined control data type
 
 // Dimension of internal data buffer and DMA chunk
 // By extension, this value also corresponds to the DMA burst dimension (number of beats)
-#define TRAFFIC_CFG_SIZE 64
+#define TRAFFIC_CFG_SIZE 256
 #define TRAFFIC_CFG_SIZE_MAX 256
 
 // Optimizations
 #define TRAFFIC_BURST_MODE 1 // 0: no burst, 1: automatic pipeline burst
 
 // Testbench
-#define TRAFFIC_CFG_SIZE_TEST 32
-#define COMPUTE_CFG_SIZE_TEST 32
+#define N_LOOPS_TEST 32
+#define TRAFFIC_CFG_SIZE_TEST TRAFFIC_CFG_SIZE*N_LOOPS_TEST
+#define COMPUTE_CFG_SIZE_TEST TRAFFIC_CFG_SIZE*N_LOOPS_TEST
 #define TRAFFIC_CFG_IDX_TEST 3
 
-void axi_hls_tg(
+/* DMA read module */
+
+template<typename D, typename C>
+void axi_hls_tg_read(
+    D *dst, 
 #if TRAFFIC_BURST_MODE == 0
-    volatile data_t *traffic_dst,
+    volatile D *src,
 #elif TRAFFIC_BURST_MODE == 1
-    data_t *traffic_dst,
+    D *src,
+#endif 
+    C size
+){
+    read_from: memcpy((D*)dst, (const D*)src, size * sizeof(D));
+}
+
+/* Computation module */
+
+template<typename D, typename C, typename v>
+void axi_hls_tg_compute(
+#if TRAFFIC_BURST_MODE == 0
+    volatile D *buffer,
+#elif TRAFFIC_BURST_MODE == 1
+    D *buffer,
+#endif 
+    C id, 
+    C size
+){
+    compute: for (v i = 0; i < size; i++) {
+    #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
+        buffer[i] += id;
+    }
+}
+    
+/* DMA write module */
+
+template<typename D, typename C>
+void axi_hls_tg_write(
+#if TRAFFIC_BURST_MODE == 0
+    volatile D *dst, 
+#elif TRAFFIC_BURST_MODE == 1
+    D *dst, 
+#endif  
+    D *src,
+    C size
+){
+    write_back: memcpy((D*)dst, src, size * sizeof(D));
+}
+
+/* Traffic generator top definition */
+
+void axi_hls_tg(
+    // AXI4 interfaces
+#if TRAFFIC_BURST_MODE == 0
+    volatile wide_t *wide_port,
+    volatile narrow_t *narrow_port,
+#elif TRAFFIC_BURST_MODE == 1
+    wide_t *wide_port,
+    narrow_t *narrow_port,
 #endif
-    data_t traffic_dim,
-    data_t compute_dim,
-    data_t traffic_id
+    // Traffic dimension
+    ctrl_t traffic_dim,
+    // Compute dimension
+    ctrl_t compute_dim,
+    // Traffic ID
+    ctrl_t traffic_id
 );
 
 #endif

@@ -30,70 +30,28 @@
 
 #include "axi_hls_tg.h"
 
-/* Read module */
-
-void axi_hls_tg_read(
-    data_t *dst, 
-#if TRAFFIC_BURST_MODE == 0
-    volatile data_t *src,
-#elif TRAFFIC_BURST_MODE == 1
-    data_t *src,
-#endif 
-    data_t size
-){
-    read_from: memcpy((data_t*)dst, (const data_t*)src, size * sizeof(data_t));
-}
-
-/* Computation module */
-
-void axi_hls_tg_compute(
-#if TRAFFIC_BURST_MODE == 0
-    volatile data_t *buffer,
-#elif TRAFFIC_BURST_MODE == 1
-    data_t *buffer,
-#endif 
-    data_t id, 
-    data_t size
-){
-    compute: for (int i = 0; i < size; i++) {
-    #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE max=TRAFFIC_CFG_SIZE
-        buffer[i] += id;
-    }
-}
-
-/* Write module */
-
-void axi_hls_tg_write(
-#if TRAFFIC_BURST_MODE == 0
-    volatile data_t *dst, 
-#elif TRAFFIC_BURST_MODE == 1
-    data_t *dst, 
-#endif  
-    data_t *src,
-    data_t size
-){
-    write_back: memcpy((data_t*)dst, src, size * sizeof(data_t));
-}
-
 /* Traffic generator top */
 
 void axi_hls_tg(
     // AXI4 interfaces
 #if TRAFFIC_BURST_MODE == 0
-    volatile data_t *traffic_dst,
+    volatile wide_t *wide_port,
+    volatile narrow_t *narrow_port,
 #elif TRAFFIC_BURST_MODE == 1
-    data_t *traffic_dst,
+    wide_t *wide_port,
+    narrow_t *narrow_port,
 #endif
     // Traffic dimension
-    data_t traffic_dim,
+    ctrl_t traffic_dim,
     // Compute dimension
-    data_t compute_dim,
+    ctrl_t compute_dim,
     // Traffic ID
-    data_t traffic_id
+    ctrl_t traffic_id
 ) {
 
     // Traffic generation
-    #pragma HLS INTERFACE mode=m_axi port=traffic_dst depth=TRAFFIC_CFG_SIZE bundle=traffic_dst
+    #pragma HLS INTERFACE mode=m_axi port=wide_port depth=TRAFFIC_CFG_SIZE bundle=wide_port
+    #pragma HLS INTERFACE mode=m_axi port=narrow_port depth=TRAFFIC_CFG_SIZE bundle=narrow_port
 
     // Traffic control
     #pragma HLS INTERFACE mode=s_axilite port=traffic_dim
@@ -108,20 +66,24 @@ void axi_hls_tg(
     #pragma HLS pipeline
 #endif
 
-    data_t local_buffer[TRAFFIC_CFG_SIZE];
+    wide_t wide_buffer[TRAFFIC_CFG_SIZE];
+    narrow_t narrow_buffer[TRAFFIC_CFG_SIZE];
 
-    for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
+    read_loop: for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
     #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
-        axi_hls_tg_read(local_buffer, traffic_dst, TRAFFIC_CFG_SIZE);
+        axi_hls_tg_read<wide_t, ctrl_t>(wide_buffer, wide_port, TRAFFIC_CFG_SIZE);
+        axi_hls_tg_read<narrow_t, ctrl_t>(narrow_buffer, narrow_port, TRAFFIC_CFG_SIZE);
     }
 
-    for (int i = 0; i < (compute_dim/TRAFFIC_CFG_SIZE); i++) {
+    compute_loop: for (int i = 0; i < (compute_dim/TRAFFIC_CFG_SIZE); i++) {
     #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
-        axi_hls_tg_compute(local_buffer, traffic_id, TRAFFIC_CFG_SIZE);
+        axi_hls_tg_compute<wide_t, ctrl_t, int>(wide_buffer, traffic_id, TRAFFIC_CFG_SIZE);
+        axi_hls_tg_compute<narrow_t, ctrl_t, int>(narrow_buffer, traffic_id, TRAFFIC_CFG_SIZE);
     }
     
-    for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
+    write_loop: for (int i = 0; i < (traffic_dim/TRAFFIC_CFG_SIZE); i++) {
     #pragma HLS LOOP_TRIPCOUNT min=TRAFFIC_CFG_SIZE_MAX max=TRAFFIC_CFG_SIZE_MAX
-        axi_hls_tg_write(traffic_dst, local_buffer, TRAFFIC_CFG_SIZE);
+        axi_hls_tg_write<wide_t, ctrl_t>(wide_port, wide_buffer, TRAFFIC_CFG_SIZE);
+        axi_hls_tg_write<narrow_t, ctrl_t>(narrow_port, narrow_buffer, TRAFFIC_CFG_SIZE);
     }
 }
